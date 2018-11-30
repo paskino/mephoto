@@ -94,7 +94,7 @@ It should have the following features:
 
 If the application is running on the local machine, no permission checking should be performed (basic standard file system permission however will of course apply).
 If the application is deployed on a production Internet accessible webserver then a complex logic of permission checking should be applied.
-Since it is probably hard to auto-detect the different cases in a Node.js app, this should be a configuration parameter (or environment variable) to establish that (eg. LOCAL_ENV=true, LOCAL_ENV=false). In such case, what should be the default?
+Since it is probably hard to auto-detect the different cases in a Node.js app, this should be a configuration parameter (or environment variable) to establish that (eg. `LOCAL_ENV=true`, `LOCAL_ENV=false`). In such case, what should be the default?
 
 Permissions should be defined on the following entities:
 - entire website
@@ -160,8 +160,8 @@ Website
 ...
 ```     
 
-With the structure defined above, for instance if global website defines itself to be public, all entities are public, unless exceptions are defined for each one.
-For instance: Website public, Collection 1 visibile only for users 1, 2 and 3, Album 1.2 only visibile for users 1 and 2, Picture X in Album 1.2 only visible for user 1. 
+With the structure defined above, for instance if the global website defines itself to be public, all entities are public, unless exceptions are defined for each one.
+For instance: Website public, Collection 1 visible only for users 1, 2 and 3, Album 1.2 only visible for users 1 and 2, Picture X in Album 1.2 only visible for user 1. 
 The system is complex and need to intercept conflicts (for instance Album A only visible to user 1 and 2 and Picture X in Album A only visible to user 3... unless the same picture is also published in another album, or folder, visible to user 3).
 
 
@@ -169,53 +169,59 @@ The system is complex and need to intercept conflicts (for instance Album A only
 
 ### URLs for standard navigation
 
-/ => home page: should show what the user decided, depending on options, theme, templates, visibility (could for instance display list of public albums, folders, stream of public pictures... actually visibility should depend on user)
+| route                                                        | meaning   |
+|--------------------------------------------------------------|------------------------------------------|
+| `/`                                                          | home page: should show what the user decided, depending on options, theme, templates, visibility (could for instance display list of public albums, folders, stream of public pictures... actually visibility should depend on user)  |
+| `/<folder>`                                                  | if navigation by folder is enabled, it should show (depending on visibility and user), list of subfolders, stream (what is a stream) of pictures in folder `<folder>`   |
+| `/<folder>/<subfolder>`                                      | as above, recursive (depending on visibility and user), list of subfolders, stream of pictures in folder <subfolder> and so on  |
+| `/<collection>`                                              | list of albums in a specific collection  |
+| `/<album>`                                                   | stream of a picture in album  |
+| `/<secreturl>`                                               | alias for an album, with optionally limited time validity, where visibility permission checks are disabled   |
+| `/p/<params>/<folder>[/<subfolder>[/...]]/<picture_filename>`| render a picture (or movie) where `<params>` are SLIR like URL parameters for resizing, cropping and other operation on the picture  |
+| `/p/<params>/<album>/<picture_id>`                           | as above, but linked to a specific album, picture is identified by the database id rather than the filesystem path   |
+| `/p/<params>/<secreturl>/<picture_id>`                       | as above, linked to the aliased album, where visibility permission checks are disabled   |
 
-/<folder> => if navigation by folder is enabled, it should show (depending on visibility and user), list of subfolders, stream of pictures in folder <folder>
+Every album and every collection should have a [slug](https://en.wikipedia.org/wiki/Clean_URL#Slug) that potentially could collide with folder names. We need to understand if collision can be easily avoided. The problem is that if the user creates a new folder with the same name of an existing album slug... in such case collision cannot be avoided, but can be intercepted.
 
-/<folder>/<subfolder> => if navigation by folder is enabled, it should show (depending on visibility and user), list of sub-sub-folders, stream of pictures in folder <subfolder>
+A solution is to have a different URL prefix to distinguish between albums/collections and folders, e.g.: `/<something>` means that `something` should be considered a folder, while `/a/<something>` means that `something` should be considered an album.
 
-  and so on ...
-
-/<collection>
-
-/<album>
-
-/<secreturl>
-
-URL which produce pictures (and videos)
-
-/p/<params>/<folder>[/<subfolder>[/...]]/<picture_filename>
-
-/p/<params>/<album>/<picture_id>
-
-/p/<params>/<secreturl>/<picture_id>
-
+**What is a stream**: to be clarified, could be the list of pictures, paginated or not. The web page could have a paginated view, an infinite scrolling, a mixture of both (like Flickr).
 
 ### URLs for special operations (to be done)
 
+```
 /auth 
 
 /admin ...
+```
 
+### URLs for APIs
 
-### APIs
+**GET Apis**
 
-GET Apis
-
+```
 GET /api/folders[/:folder[/:folder[...]]]
 GET /api/collections
 GET /api/albums[/:collection_id]
 GET /api/pictures[/:album_id|/:folder|/notInAlbum|/:tag|/:secreturl]
 GET /api/pictureInfo/:pictureId
 GET /api/pictureComments/:pictureId
+```
 
-POST Apis
+**POST Apis**
+```
+To be done
+```
 
-PUT Apis
+**PUT Apis**
+```
+To be done
+```
 
-DELETE Apis
-
+**DELETE Apis**
+```
+To be done
+```
 
 
 ## Guideline
@@ -223,7 +229,7 @@ DELETE Apis
 Every operation in the interface should have a corresponding API
 The idea is to make the APIs the entry point both for the interface itself and for any RESTful client of the application.
 
-
+The question is... SPA (single page application) or standard application with some usage of the API?
 
 
 ## To be clarified:
