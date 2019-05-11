@@ -74,6 +74,23 @@ class App(QMainWindow):
         self.toolbar.addAction(openAction)
         self.toolbar.addAction(saveAction)
 
+    def keyPressEvent(self, e):
+        if e.key() == QtCore.Qt.Key_Right:
+            print ("Right")
+            if self.index < len(self.filenames)-1 and not self.index == -1:
+                self.index += 1
+                self.statusBar().showMessage('{}/{} {}'.format(self.index, len(self.filenames),
+                  self.filenames[self.index]))
+                self.loadFile(self.filenames[self.index])
+
+        if e.key() == QtCore.Qt.Key_Left:
+            print ("Left")
+            if self.index > 0:
+                self.index -= 1
+                self.loadFile(self.filenames[self.index])
+                self.statusBar().showMessage('{}/{} {}'.format(self.index, len(self.filenames),
+                  self.filenames[self.index]))
+
 
     def openFile(self):
         fn = QFileDialog.getOpenFileNames(self, 'Open File')
@@ -84,31 +101,30 @@ class App(QMainWindow):
 
         # Single file selection
         if len(fn[0]) == 1:
+            self.index = -1
             fname = fn[0][0]
-            what = imghdr.what(fname)
-            if what in ['jpeg', 'png']:
-                # can be read
-                self.label.pixmap().load(fname)
-                size = QtCore.QSize(self.width, self.height)
-                scaled_pixmap = self.label.pixmap().scaled(size, 
-                   aspectRatioMode=QtCore.Qt.KeepAspectRatio) #QtCore.Qt.KeepAspectRatioByExpanding)
-                self.label.setPixmap(scaled_pixmap)
+            self.filenames = fname
+            self.loadFile(fname)
         # Multiple TIFF files selected
         else:
             # Make sure that the files are sorted 0 - end
-            filenames = natsorted(fn[0])
-
-            # Basic test for tiff images
-            for fname in filenames:
-                ftype = imghdr.what(fname)
-                if ftype != 'tiff':
-                    # A non-TIFF file has been loaded, present error message and exit method
-                    self.e('','','When reading multiple files, all files must TIFF formatted.')
-                    fname = fname
-                    self.displayFileErrorDialog(fname)
-                    return
+            #filenames = natsorted(fn[0])
+            filenames = fn[0]
+            self.filenames = filenames
+            self.index = 0
+            self.loadFile(filenames[0])
         self.show()
 
+    def loadFile(self, fname):
+        what = imghdr.what(fname)
+        if what in ['jpeg', 'png']:
+            # can be read
+            self.label.pixmap().load(fname)
+            size = QtCore.QSize(self.width, self.height)
+            scaled_pixmap = self.label.pixmap().scaled(size, 
+                aspectRatioMode=QtCore.Qt.KeepAspectRatio) #QtCore.Qt.KeepAspectRatioByExpanding)
+            self.label.setPixmap(scaled_pixmap)
+    
     def initUI(self):
         self.setWindowTitle(self.title)
         self.setGeometry(self.left, self.top, self.width, self.height)
@@ -133,6 +149,7 @@ class App(QMainWindow):
         label = QLabel(self)
         #label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.label = label
+        #self.index = -1
         self.pixmap = QPixmap('image.jpeg')
         
         #self.resize(pixmap.width(),pixmap.height())
