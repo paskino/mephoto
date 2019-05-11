@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QAction, \
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5 import QtGui, QtCore
 import imghdr
+from PIL import Image
 
 #from PyQt5.QtWidgets import *
 
@@ -75,11 +76,13 @@ class App(QMainWindow):
         self.toolbar.addAction(saveAction)
 
     def keyPressEvent(self, e):
+        '''Advances forward or backward with arrow keys'''
         if e.key() == QtCore.Qt.Key_Right:
             print ("Right")
             if self.index < len(self.filenames)-1 and not self.index == -1:
                 self.index += 1
-                self.statusBar().showMessage('{}/{} {}'.format(self.index, len(self.filenames),
+                self.statusBar().showMessage('{}/{} {}'.format(self.index, 
+                len(self.filenames)-1,
                   self.filenames[self.index]))
                 self.loadFile(self.filenames[self.index])
 
@@ -88,11 +91,13 @@ class App(QMainWindow):
             if self.index > 0:
                 self.index -= 1
                 self.loadFile(self.filenames[self.index])
-                self.statusBar().showMessage('{}/{} {}'.format(self.index, len(self.filenames),
+                self.statusBar().showMessage('{}/{} {}'.format(self.index, 
+                len(self.filenames)-1,
                   self.filenames[self.index]))
 
 
     def openFile(self):
+        '''Opens a file or a list of files'''
         fn = QFileDialog.getOpenFileNames(self, 'Open File')
         # If the user has pressed cancel, the first element of the tuple will be empty.
         # Quit the method cleanly
@@ -119,8 +124,27 @@ class App(QMainWindow):
         what = imghdr.what(fname)
         if what in ['jpeg', 'png']:
             # can be read
+            if what == 'jpeg':
+                # read the exif orientation
+                # Orientation -> 274
+                # 1 0 degrees – the correct orientation, no adjustment is required.
+                # 2 0 degrees, mirrored – image has been flipped back-to-front.
+                # 3 80 degrees – image is upside down.
+                # 4 180 degrees, mirrored – image is upside down and flipped back-to-front.
+                # 5 90 degrees – image is on its side.
+                # 6 90 degrees, mirrored – image is on its side and flipped back-to-front.
+                # 7 270 degrees – image is on its far side.
+                # 8 270 degrees, mirrored – image is on its far side and flipped back-to-front.
+                try:
+                    orientation = Image.open(fname)._getexif()[274]
+                    print ("orientation ", orientation)
+                except KeyError as ke:
+                    print (ke)
+
             self.label.pixmap().load(fname)
             size = QtCore.QSize(self.width, self.height)
+            #if orientation =! 0:
+
             scaled_pixmap = self.label.pixmap().scaled(size, 
                 aspectRatioMode=QtCore.Qt.KeepAspectRatio) #QtCore.Qt.KeepAspectRatioByExpanding)
             self.label.setPixmap(scaled_pixmap)
