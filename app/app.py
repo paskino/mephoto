@@ -1,10 +1,12 @@
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QAction, \
     QFrame, QVBoxLayout, QMainWindow, QStyle, QFileDialog, QSizePolicy
-from PyQt5.QtGui import QIcon, QPixmap
+from PyQt5.QtGui import QIcon, QPixmap, QTransform, QPainter, QPen
 from PyQt5 import QtGui, QtCore
 import imghdr
 from PIL import Image
+import dlib
+import numpy as np
 
 #from PyQt5.QtWidgets import *
 
@@ -39,6 +41,8 @@ class App(QMainWindow):
         self.height = 480
         self.initUI()
         self.e = ErrorObserver()
+        self.detector = dlib.get_frontal_face_detector()
+        self.frect = None
 
     def resizeEvent(self, event):
         #self.resized.emit()
@@ -137,18 +141,76 @@ class App(QMainWindow):
                 # 8 270 degrees, mirrored – image is on its far side and flipped back-to-front.
                 try:
                     orientation = Image.open(fname)._getexif()[274]
-                    print ("orientation ", orientation)
                 except KeyError as ke:
                     print (ke)
+                    orientation = 1
+                except TypeError as te:
+                    print (te)
+                    orientation = 1
+                print ("orientation ", orientation)
 
             self.label.pixmap().load(fname)
             size = QtCore.QSize(self.width, self.height)
-            #if orientation =! 0:
-
-            scaled_pixmap = self.label.pixmap().scaled(size, 
-                aspectRatioMode=QtCore.Qt.KeepAspectRatio) #QtCore.Qt.KeepAspectRatioByExpanding)
+            if orientation in [1,2]:
+                scaled_pixmap = self.label.pixmap()\
+                                       .scaled(size, 
+                                aspectRatioMode=QtCore.Qt.KeepAspectRatio) #QtCore.Qt.KeepAspectRatioByExpanding)
+            else:
+                if orientation in [3,4]:
+                    deg = 180
+                elif orientation in [5,6]:
+                    deg = 90
+                elif orientation in [7,8]:
+                    deg = -90
+                transform = QTransform().rotate(deg)
+                rotated = self.label.pixmap().transformed(transform)
+                scaled_pixmap = rotated.scaled(size, 
+                                aspectRatioMode=QtCore.Qt.KeepAspectRatio) #QtCore.Qt.KeepAspectRatioByExpanding)
             self.label.setPixmap(scaled_pixmap)
+
+            self.face_detect(fname)
     
+    def face_detect(self, fname):
+        print ("Running face detection")
+        img = Image.open(fname).convert('L')
+        print (img, img.size)
+        # TODO resize image to something reasonable
+        data = np.array( img, dtype='uint8' )
+        
+        # The 1 in the second argument indicates that we should upsample the image
+        # 1 time.  This will make everything bigger and allow us to detect more
+        # faces.
+        dets = self.detector(data, 1)
+        print("Number of faces detected: {}".format(len(dets)))
+        #ax.imshow(data, cmap='gray')
+        if len(dets) == 0:
+            self.frect = None
+        
+        for i, d in enumerate(dets):
+            print("Detection {}: Left: {} Top: {} Right: {} Bottom: {}".format(
+                i, d.left(), d.top(), d.right(), d.bottom()))
+            # Create a Rectangle patch
+            xsize = d.right() - d.left()
+            ysize = d.top() - d.bottom()
+            self.frect = (d.left(), d.top(), xsize, ysize)
+            #rect = patches.Rectangle((d.left(),d.bottom()),xsize,ysize,linewidth=1,edgecolor='r',facecolor='none')
+            #ax.add_patch(rect)
+            painter = QPainter(self)
+            painter.begin(self)
+            self.drawRect('', painter)
+            painter.end()
+
+    def spaintEvent(self, event):
+        painter = QPainter(self.label)
+        painter.begin(self)
+        self.drawRect(event, painter)
+        painter.end()
+    def drawRect(self, event, painter):
+        if self.frect is not None:
+            pen = QPen(QtCore.Qt.red, 3)
+            painter.setPen(pen)
+            painter.drawRect(*self.frect)
+
     def initUI(self):
         self.setWindowTitle(self.title)
         self.setGeometry(self.left, self.top, self.width, self.height)
@@ -174,7 +236,7 @@ class App(QMainWindow):
         #label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.label = label
         #self.index = -1
-        self.pixmap = QPixmap('image.jpeg')
+        self.pixmap = QPixmap()
         
         #self.resize(pixmap.width(),pixmap.height())
         size = QtCore.QSize(self.width, self.height)
