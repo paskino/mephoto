@@ -172,9 +172,35 @@ class App(QMainWindow):
     
     def face_detect(self, fname):
         print ("Running face detection")
-        img = Image.open(fname).convert('L')
+        image = Image.open(fname)
+        img = image.convert('L')
         print (img, img.size)
         # TODO resize image to something reasonable
+        size = list(img.size)
+        try:
+            orientation = image._getexif()[274]
+        except KeyError as ke:
+            print (ke)
+            orientation = 1
+        except TypeError as te:
+            print (te)
+            orientation = 1
+        print ("orientation ", orientation)
+
+        
+        if orientation in [5,6,7,8]:
+            tsize = (480,640)
+        else:
+            tsize = (640,480)
+        ds = 0
+        while size[0] > tsize[0] or size[1] > tsize[1]:
+            size[0] = int(size[0]/2)
+            size[1] = int(size[1]/2)
+            print ("current resize", size)
+            ds += 1
+        size = [2* i for i in size]
+        img = img.resize(size)
+            
         data = np.array( img, dtype='uint8' )
         
         # The 1 in the second argument indicates that we should upsample the image
@@ -186,22 +212,25 @@ class App(QMainWindow):
         if len(dets) == 0:
             self.frect = None
         
+        self.frect = []
         for i, d in enumerate(dets):
             print("Detection {}: Left: {} Top: {} Right: {} Bottom: {}".format(
                 i, d.left(), d.top(), d.right(), d.bottom()))
             # Create a Rectangle patch
-            xsize = d.right() - d.left()
-            ysize = d.top() - d.bottom()
-            self.frect = (d.left(), d.top(), xsize, ysize)
+            xsize = (d.right() - d.left()) 
+            ysize = (d.top() - d.bottom())
+
+            scalex = xsize / self.width 
+            scaley = ysize / self.height 
+            self.frect.append(
+                 [ i  for i in ((d.left()+ self.width) / ds, (d.bottom() + self.height)/ds, xsize, ysize)]
+            )
             #rect = patches.Rectangle((d.left(),d.bottom()),xsize,ysize,linewidth=1,edgecolor='r',facecolor='none')
             #ax.add_patch(rect)
-            painter = QPainter(self)
-            painter.begin(self)
-            self.drawRect('', painter)
-            painter.end()
+            
 
-    def spaintEvent(self, event):
-        painter = QPainter(self.label)
+    def paintEvent(self, event):
+        painter = QPainter(self)
         painter.begin(self)
         self.drawRect(event, painter)
         painter.end()
@@ -209,7 +238,8 @@ class App(QMainWindow):
         if self.frect is not None:
             pen = QPen(QtCore.Qt.red, 3)
             painter.setPen(pen)
-            painter.drawRect(*self.frect)
+            for fr in self.frect:
+                painter.drawRect(*fr)
 
     def initUI(self):
         self.setWindowTitle(self.title)
