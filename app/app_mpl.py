@@ -16,7 +16,8 @@ else:
         FigureCanvas, NavigationToolbar2QT as NavigationToolbar)
 from matplotlib.figure import Figure
 import matplotlib.patches as patches
-
+from matplotlib.offsetbox import (TextArea, DrawingArea, OffsetImage,
+                                  AnnotationBbox)
 
 #from PyQt5.QtWidgets import *
 
@@ -261,11 +262,22 @@ class App(QMainWindow):
         
         self._static_ax.imshow(data)
         if rect is not None:
-            for d in rect:
+            for i,d in enumerate(rect):
                 print (d)
                 #rect = patches.Rectangle((d.left(),d.bottom()),xsize,ysize,linewidth=1,edgecolor='r',facecolor='none')
                 face = patches.Rectangle((d[0],d[1]),d[2],d[3],linewidth=1,edgecolor='r',facecolor='none')
                 self._static_ax.add_patch(face)
+                # annotation
+                # Annotate the face position with a text box ('1')
+                offsetbox = TextArea("{}".format(i), minimumdescent=False)
+
+                ab = AnnotationBbox(offsetbox, (d[0],d[1]+d[3]),
+                                xybox=(0, 0),
+                                xycoords='data',
+                                boxcoords="offset points",
+                                arrowprops=dict(arrowstyle="->"))
+                self._static_ax.add_artist(ab)
+
         self.image_canvas.draw()
          
     
