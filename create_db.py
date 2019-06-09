@@ -13,16 +13,39 @@ import matplotlib.patches as patches
 from matplotlib.offsetbox import (TextArea, DrawingArea, OffsetImage,
                                   AnnotationBbox)
 import PIL
+import imghdr
+import pickle
 
 class MePhoto(object):
-    def __init__(self, **kwargs):
-        self.detector = dlib.get_frontal_face_detector()
+    '''MePhoto Class
+
+    uses dlib to recognise and tag faces in images
+    saves a json library.
     
-    def face_detect(self, image):
+    You can download a trained facial shape predictor and recognition model from:
+         http://dlib.net/files/shape_predictor_5_face_landmarks.dat.bz2
+         http://dlib.net/files/dlib_face_recognition_resnet_model_v1.dat.bz2
+    '''
+    def __init__(self, **kwargs):
+        predictor_path = kwargs.get('predictor_path', 'shape_predictor_5_face_landmarks.dat')
+        face_rec_model_path = kwargs.get('face_rec_model_path', 'dlib_face_recognition_resnet_model_v1.dat')
+        self.detector = dlib.get_frontal_face_detector()
+        self.sp = dlib.shape_predictor(os.path.abspath(predictor_path))
+        self.facerec = dlib.face_recognition_model_v1(
+            os.path.abspath(face_rec_model_path))
+
+        self.faces_file = kwargs.get('faces_file', 'mephoto_tags.pkl')
+        if os.path.exists(os.path.abspath(self.faces_file)):
+            with open(os.path.abspath(self.faces_file), 'rb') as f:
+                self.known_faces = pickle.load(f)
+        else:
+            self.known_faces = {}
+    
+    def face_detect(self, image, filename):
         print ("Running face detection")
             
         img = image.convert('L')
-        print (img, img.size)
+        # print (img, img.size)
         # TODO resize image to something reasonable
         size = list(img.size)
         try:
@@ -45,10 +68,10 @@ class MePhoto(object):
             size[0] = int(size[0]/2)
             size[1] = int(size[1]/2)
             ds += 1
-            print ("current resize", ds, size)
+            # print ("current resize", ds, size)
         zoom = 2**ds
         # size = [2 * i for i in size]
-        print ("current resize", ds, size)
+        # print ("current resize", ds, size)
             
         img = img.resize(size)
             
@@ -67,10 +90,24 @@ class MePhoto(object):
             print("d",type(d))
             print("Detection {}: Left: {} Top: {} Right: {} Bottom: {}".format(
                 i, d.left(), d.top(), d.right(), d.bottom()))
+            
+            # Get the landmarks/parts for the face in box d.
+            shape = self.sp(data, d)
+            # Compute the 128D vector that describes the face in img identified by
+            # shape.  In general, if two face descriptor vectors have a Euclidean
+            # distance between them less than 0.6 then they are from the same
+            # person, otherwise they are from different people. Here we just print
+            # the vector to the screen.
+            rgb = np.array(image)
+            face_descriptor = self.facerec.compute_face_descriptor(rgb, shape)
+            name = self.get_name_from_descriptor(face_descriptor)
+            
             faces.append(
-                {'name': None,
+                {'name': name,
             'left': d.left() * zoom, 'top': d.top() * zoom, 
-            'right': d.right() * zoom, 'bottom': d.bottom() * zoom})
+            'right': d.right() * zoom, 'bottom': d.bottom() * zoom,
+            'descriptor': face_descriptor})
+
         return faces
 
     def add_entry(self, filename):
@@ -85,7 +122,7 @@ class MePhoto(object):
         exif = {}
         for k, v in img._getexif().items():
             if k in PIL.ExifTags.TAGS:
-                print (PIL.ExifTags.TAGS[k])
+                # print (PIL.ExifTags.TAGS[k])
                 if isinstance(v, bytes):
                     exif[PIL.ExifTags.TAGS[k]] = str(v)
                 else:
@@ -95,10 +132,14 @@ class MePhoto(object):
         
         entry = {}
         entry['file'] = filename
-        entry['exif'] = exif
+        #entry['exif'] = exif
+        entry['year'] = dt.year
+        entry['month'] = dt.month
+        entry['day'] = dt.day
+        entry['time'] = '{}:{}:{}'.format(dt.hour, dt.minute, dt.second)
         # find faces in there
         
-        entry['faces'] = self.face_detect(img)
+        entry['faces'] = self.face_detect(img, filename)
         # create a dlib rectangle as 
         # for face in entry['faces']:
         #     d = dlib.rectangle(face['left'], face['top'], face['right'],
@@ -136,27 +177,69 @@ class MePhoto(object):
                             arrowprops=dict(arrowstyle="->"))
             ax.add_artist(ab)
         plt.show()
+        return plt
     def tag_entry(self, entry):
         for i,el in enumerate(entry['faces']):
-            tag = input('Please insert name of face {}: '.format(i))
-            if tag == '':
-                tag = None
-            print ("recording face as ", tag)
-            el['name'] = tag
-            print ("el" , el['name'])
+            name = el['name'] 
+            if el['name'] is not None:
+                tag = input('Please confirm that the face is from: {}'.format(el['name']))
+                if tag is not '':
+                    print ("recording face as ", tag)
+                    el['name'] = tag
+                else:
+                    print ("face confirmed ", el['name'])
+            else:
+                tag = input('Please insert name of face {}: '.format(i))
+                if tag == '':
+                    tag = None
+                else:
+                    print ("adding", tag, "to known faces")
+                    self.known_faces['name'] = tag
+                    self.known_faces['descriptor'] = el['descriptor']
+                    el.pop('descriptor')
+
+                print ("recording face as ", tag)
+                el['name'] = tag
+                print ("el" , el['name'])
         return entry
 
+    def get_name_from_descriptor(self, descriptor):
+        print ("get_name_from_descriptor")
+        for k,v in self.known_faces.items():
+            print (k,v)
+            vdist = np.array(descriptor) - np.array(v)
+            dist = numpy.sqrt(vdist.dot(vdist))
+            print ('Name ', k, 'distance', dist)
+            
+            if dist < 0.6:
+                return k
+        return None
+
 if __name__ == "__main__":
-    #start_dir = sys.argv[1]
+    start_dir = sys.argv[1]
     #pics = glob.glob(os.path.join(start_dir, '**/*'),recursive=True)
-
+    #filenames = ['IMG_20190504_200610.jpg']
+    filenames = glob.glob(os.path.join(start_dir, '**/*'),recursive=True)
+    entries = []
     mp = MePhoto()
-    entry= mp.add_entry('IMG_20190504_200610.jpg')
-    mp.display_picture(entry)
-    entry = mp.tag_entry(entry)
+    for i,fname in enumerate(filenames):
+        if imghdr.what(os.path.abspath(fname)) == 'jpeg':
+            entry = mp.add_entry(os.path.abspath(fname))
+            if len(entry['faces']) > 0:    
+                plt = mp.display_picture(entry)
+                entry = mp.tag_entry(entry)
+                print (entry)
+                plt.close()
+            entries.append(entry)
     
-
-    print (entry)
     # print (json.dumps(entry))
+    # save library to file
+    with open('mephoto.json', 'w') as f:
+        json.dump(entries, f)
+    
+    with open(os.path.abspath(self.faces_file), 'wb') as f:
+        pickle.dump(self.known_faces, f)
+
+        
     
     
