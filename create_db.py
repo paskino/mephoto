@@ -7,7 +7,12 @@ from datetime import datetime
 import dlib
 import numpy as np
 import json
-
+import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
+import matplotlib.patches as patches
+from matplotlib.offsetbox import (TextArea, DrawingArea, OffsetImage,
+                                  AnnotationBbox)
+import PIL
 
 class MePhoto(object):
     def __init__(self, **kwargs):
@@ -41,7 +46,7 @@ class MePhoto(object):
             size[1] = int(size[1]/2)
             ds += 1
             print ("current resize", ds, size)
-            
+        zoom = 2**ds
         # size = [2 * i for i in size]
         print ("current resize", ds, size)
             
@@ -59,13 +64,13 @@ class MePhoto(object):
             return []
         faces = []
         for i, d in enumerate(dets):
+            print("d",type(d))
             print("Detection {}: Left: {} Top: {} Right: {} Bottom: {}".format(
                 i, d.left(), d.top(), d.right(), d.bottom()))
             faces.append(
                 {'name': None,
-            'left': d.left(), 'top': d.top(), 
-            'right': d.right(), 'bottom': d.bottom()}
-            )
+            'left': d.left() * zoom, 'top': d.top() * zoom, 
+            'right': d.right() * zoom, 'bottom': d.bottom() * zoom})
         return faces
 
     def add_entry(self, filename):
@@ -94,18 +99,64 @@ class MePhoto(object):
         # find faces in there
         
         entry['faces'] = self.face_detect(img)
-
+        # create a dlib rectangle as 
+        # for face in entry['faces']:
+        #     d = dlib.rectangle(face['left'], face['top'], face['right'],
+        #                        face['bottom'] )3
         return entry
 
-    
+    def display_picture(self, entry):
+        #canvas = FigureCanvas(Figure(figsize=(5, 3)))
+        #self.image_canvas = canvas
+        #self.vl.addWidget(canvas)
+        #self.addToolBar(NavigationToolbar(canvas, self))
+
+        #self._static_ax = canvas.figure.subplots()
+        image = PIL.Image.open(entry['file'])
+        plt.ion()
+        fig, ax = plt.subplots()
+
+        ax.imshow(image)
+        rect = entry['faces']
+        for i,el in enumerate(rect):
+            d = (el['left'], el['top'], el['right'], el['bottom'])
+            print (d)
+            #rect = patches.Rectangle((d.left(),d.bottom()),xsize,ysize,linewidth=1,edgecolor='r',facecolor='none')
+            face = patches.Rectangle((d[0],d[1]),d[3]-d[1],d[2]-d[0],
+                   linewidth=1,edgecolor='r',facecolor='none')
+            ax.add_patch(face)
+            # annotation
+            # Annotate the face position with a text box ('1')
+            offsetbox = TextArea("{}".format(i), minimumdescent=False)
+
+            ab = AnnotationBbox(offsetbox, (d[2],d[3]),
+                            xybox=(0,0),
+                            xycoords='data',
+                            boxcoords="offset points",
+                            arrowprops=dict(arrowstyle="->"))
+            ax.add_artist(ab)
+        plt.show()
+    def tag_entry(self, entry):
+        for i,el in enumerate(entry['faces']):
+            tag = input('Please insert name of face {}: '.format(i))
+            if tag == '':
+                tag = None
+            print ("recording face as ", tag)
+            el['name'] = tag
+            print ("el" , el['name'])
+        return entry
 
 if __name__ == "__main__":
     #start_dir = sys.argv[1]
     #pics = glob.glob(os.path.join(start_dir, '**/*'),recursive=True)
 
     mp = MePhoto()
-    entry = mp.add_entry('IMG_20190504_200610.jpg')
+    entry= mp.add_entry('IMG_20190504_200610.jpg')
+    mp.display_picture(entry)
+    entry = mp.tag_entry(entry)
+    
+
     print (entry)
-    print (json.dumps(entry))
+    # print (json.dumps(entry))
     
     
