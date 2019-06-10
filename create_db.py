@@ -39,7 +39,7 @@ class MePhoto(object):
             with open(os.path.abspath(self.faces_file), 'rb') as f:
                 self.known_faces = pickle.load(f)
         else:
-            self.known_faces = {}
+            self.known_faces = []
     
     def face_detect(self, image, filename):
         print ("Running face detection")
@@ -182,7 +182,7 @@ class MePhoto(object):
         for i,el in enumerate(entry['faces']):
             name = el['name'] 
             if el['name'] is not None:
-                tag = input('Please confirm that the face is from: {}'.format(el['name']))
+                tag = input('Please confirm that the face {} is from {}: '.format(i,el['name']))
                 if tag is not '':
                     print ("recording face as ", tag)
                     el['name'] = tag
@@ -194,9 +194,11 @@ class MePhoto(object):
                     tag = None
                 else:
                     print ("adding", tag, "to known faces")
-                    self.known_faces['name'] = tag
-                    self.known_faces['descriptor'] = el['descriptor']
+                    face = {}
+                    face['name'] = tag
+                    face['descriptor'] = el['descriptor']
                     el.pop('descriptor')
+                    self.known_faces.append(face)
 
                 print ("recording face as ", tag)
                 el['name'] = tag
@@ -205,14 +207,15 @@ class MePhoto(object):
 
     def get_name_from_descriptor(self, descriptor):
         print ("get_name_from_descriptor")
-        for k,v in self.known_faces.items():
-            print (k,v)
+        for face in self.known_faces:
+            v = face['descriptor']
             vdist = np.array(descriptor) - np.array(v)
-            dist = numpy.sqrt(vdist.dot(vdist))
-            print ('Name ', k, 'distance', dist)
+            dist = np.sqrt(vdist.dot(vdist))
+            #dist = np.sqrt((vdist**2).sum())
+            print ('Name ', face['name'], 'distance', dist)
             
             if dist < 0.6:
-                return k
+                return face['name']
         return None
 
 if __name__ == "__main__":
