@@ -101,12 +101,12 @@ class MePhoto(object):
             rgb = np.array(image)
             face_descriptor = self.facerec.compute_face_descriptor(rgb, shape)
             name = self.get_name_from_descriptor(face_descriptor)
-            
+            ldescr = [ vec for vec in face_descriptor ]
             faces.append(
                 {'name': name,
             'left': d.left() * zoom, 'top': d.top() * zoom, 
             'right': d.right() * zoom, 'bottom': d.bottom() * zoom,
-            'descriptor': face_descriptor})
+            'descriptor': ldescr})
 
         return faces
 
@@ -207,15 +207,22 @@ class MePhoto(object):
 
     def get_name_from_descriptor(self, descriptor):
         print ("get_name_from_descriptor")
+        dists = []
         for face in self.known_faces:
             v = face['descriptor']
             vdist = np.array(descriptor) - np.array(v)
-            dist = np.sqrt(vdist.dot(vdist))
+            #dist = np.sqrt(vdist.dot(vdist))
             #dist = np.sqrt((vdist**2).sum())
+            dist = np.linalg.norm(vdist)
             print ('Name ', face['name'], 'distance', dist)
-            
-            if dist < 0.6:
-                return face['name']
+            dists.append(dist)
+        
+        if len(dists) > 0:
+            a = np.asarray(dists)
+            i = np.argmin(a)
+
+            if a[i] < 0.6:
+                return self.known_faces[i]['name']
         return None
 
 if __name__ == "__main__":
@@ -226,7 +233,9 @@ if __name__ == "__main__":
     entries = []
     mp = MePhoto()
     for i,fname in enumerate(filenames):
+        print ("Checking file ", fname)
         if imghdr.what(os.path.abspath(fname)) == 'jpeg':
+            print ("Looking for faces in file ", fname)
             entry = mp.add_entry(os.path.abspath(fname))
             if len(entry['faces']) > 0:    
                 plt = mp.display_picture(entry)
@@ -240,8 +249,8 @@ if __name__ == "__main__":
     with open('mephoto.json', 'w') as f:
         json.dump(entries, f)
     
-    with open(os.path.abspath(self.faces_file), 'wb') as f:
-        pickle.dump(self.known_faces, f)
+    with open(os.path.abspath(mp.faces_file), 'wb') as f:
+        pickle.dump(mp.known_faces, f)
 
         
     
