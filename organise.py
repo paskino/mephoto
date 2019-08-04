@@ -11,6 +11,7 @@ import os
 import shutil
 import sys
 import hashlib
+import glob
 
 def md5Checksum(filePath):
     with open(filePath, 'rb') as fh:
@@ -56,14 +57,20 @@ def organise_picture(filename, destination):
     shutil.copy2(current_image, copyto)
 
 def organise_photos_in_dir(orig_dir, base_directory):
+    all_pics = glob.glob(os.path.join(orig_dir,"**","*"), recursive=True)
+    print (all_pics)
+    return organise_list_of_photos(all_pics, base_directory)
+def organise_list_of_photos(all_pics, base_directory):
 
-    all_pics = os.listdir(orig_dir)
+    #all_pics = os.listdir(orig_dir)
+
     success = []
     fail = []
     for i,el in enumerate(all_pics):
         print ("Progress {0}/{1} {2}".format(i,len(all_pics),el))
         try:
-            current_picture = os.path.join(orig_dir, el)
+            #current_picture = os.path.join(orig_dir, el)
+            current_picture = el
             organise_picture(current_picture, base_directory)
             success.append(current_picture)
         except OSError as oe:
@@ -93,5 +100,5 @@ if __name__ == '__main__':
         base_directory = os.path.abspath(sys.argv[2])
     except IndexError as ie:
         base_directory = os.path.join("/mnt","share","Pictures","tutte")
-
+    print ("organising from {} to {}".format(orig_dir, base_directory))
     organise_photos_in_dir(orig_dir, base_directory)

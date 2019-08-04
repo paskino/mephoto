@@ -34,12 +34,16 @@ class MePhoto(object):
         self.facerec = dlib.face_recognition_model_v1(
             os.path.abspath(face_rec_model_path))
 
-        self.faces_file = kwargs.get('faces_file', 'mephoto_tags.pkl')
+        # currently contains 
+        # {'name': 'Edo', 'descriptor': []}
+        # should be better
+        # {'Edo': [descriptors]} ?
+        self.faces_file = kwargs.get('faces_file', 'mephoto_tags_v2.pkl')
         if os.path.exists(os.path.abspath(self.faces_file)):
             with open(os.path.abspath(self.faces_file), 'rb') as f:
                 self.known_faces = pickle.load(f)
         else:
-            self.known_faces = []
+            self.known_faces = {}
     
     def face_detect(self, image, filename):
         print ("Running face detection")
@@ -93,6 +97,7 @@ class MePhoto(object):
             
             # Get the landmarks/parts for the face in box d.
             shape = self.sp(data, d)
+            print ("shape" , shape.part(0))
             # Compute the 128D vector that describes the face in img identified by
             # shape.  In general, if two face descriptor vectors have a Euclidean
             # distance between them less than 0.6 then they are from the same
@@ -194,11 +199,15 @@ class MePhoto(object):
                     tag = None
                 else:
                     print ("adding", tag, "to known faces")
-                    face = {}
-                    face['name'] = tag
-                    face['descriptor'] = el['descriptor']
-                    el.pop('descriptor')
-                    self.known_faces.append(face)
+                    #face = {}
+                    #face['name'] = tag
+                    #face['descriptor'] = el['descriptor']
+                    #el.pop('descriptor')
+                    #self.known_faces.append(face)
+                    if tag not in self.known_faces.keys():
+                        self.known_faces[tag] = []
+                    self.known_faces[tag].append(el['descriptor'])
+
 
                 print ("recording face as ", tag)
                 el['name'] = tag
@@ -208,21 +217,23 @@ class MePhoto(object):
     def get_name_from_descriptor(self, descriptor):
         print ("get_name_from_descriptor")
         dists = []
-        for face in self.known_faces:
-            v = face['descriptor']
-            vdist = np.array(descriptor) - np.array(v)
-            #dist = np.sqrt(vdist.dot(vdist))
-            #dist = np.sqrt((vdist**2).sum())
-            dist = np.linalg.norm(vdist)
-            print ('Name ', face['name'], 'distance', dist)
-            dists.append(dist)
+        for name,descr in self.known_faces.items():
+            for v in descr:
+                #v = face['descriptor']
+                vdist = np.array(descriptor) - np.array(v)
+                #dist = np.sqrt(vdist.dot(vdist))
+                #dist = np.sqrt((vdist**2).sum())
+                dist = np.linalg.norm(vdist)
+                #print ('Name ', face['name'], 'distance', dist)
+                print ('Name ', name, 'distance', dist)
+                dists.append([name, dist])
         
         if len(dists) > 0:
-            a = np.asarray(dists)
+            a = np.asarray([el for el in zip(*dists)][1])
             i = np.argmin(a)
 
             if a[i] < 0.6:
-                return self.known_faces[i]['name']
+                return [el for el in zip(*dists)][0][i]
         return None
 
 if __name__ == "__main__":
